@@ -6,31 +6,47 @@ pipeline {
         cron('H/5 * * * 4')
     }
 
+    tools {
+        maven 'Maven 3.8.8'   
+        jdk 'OpenJDK 17'      
+    }
+
     stages {
-        stage('Build') {
+        stage('Checkout') {
             steps {
-                sh './mvnw clean package -DskipTests'
+                git branch: 'main', url: 'https://github.com/SoCinder/spring-petclinic.git'
             }
         }
 
-        stage('Test with Coverage') {
+        stage('Build & Test') {
             steps {
-                sh './mvnw test jacoco:report'
+                sh 'mvn clean verify'
+            }
+        }
+
+        stage('Code Coverage') {
+            steps {
+                // Generate Jacoco report
+                sh 'mvn jacoco:report'
             }
             post {
                 always {
-                    junit '**/target/surefire-reports/*.xml'
-                    jacoco execPattern: '**/target/jacoco.exec',
-                           classPattern: '**/target/classes',
-                           sourcePattern: '**/src/main/java',
-                           inclusionPattern: '**/*.class',
-                           exclusionPattern: ''
+                    // Publish HTML Jacoco report in Jenkins
+                    publishHTML(target: [
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'target/site/jacoco',
+                        reportFiles: 'index.html',
+                        reportName: 'Jacoco Coverage Report'
+                    ])
                 }
             }
         }
 
-        stage('Archive Artifact') {
+        stage('Package Artifact') {
             steps {
+                sh 'mvn package'
                 archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
             }
         }
